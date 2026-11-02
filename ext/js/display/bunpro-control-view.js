@@ -42,11 +42,14 @@ export function getControlView(state, entryIndex) {
  * @param {number} entryIndex
  * @returns {import('display-bunpro').ControlView}
  */
-function getMatchView({entryItems, items, attempts, pending}, entryIndex) {
+function getMatchView({entryItems, items, attempts, pending, reviewPending}, entryIndex) {
     if (pending?.[entryIndex] === true) { return RESERVED; }
     const key = entryItems[entryIndex] ?? null;
     const match = key === null ? void 0 : items.get(key);
     if (key === null || typeof match === 'undefined') { return NONE; }
+    if (reviewPending?.has(key) === true) {
+        return {kind: 'level', level: match.level, href: vocabPageUrl(match)};
+    }
     const attempt = attempts.get(key);
     if (match.inReviews) {
         if (typeof attempt === 'undefined') { return createButtonView('check', false, match, 'Remove from Bunpro reviews'); }

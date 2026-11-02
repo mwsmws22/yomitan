@@ -68,6 +68,17 @@ describe('getControlView', () => {
         expect(getControlView(state, 0)).toStrictEqual({kind: 'reserved'});
     });
 
+    test('a resolved match waiting on hydrate shows level and link without plus or check', () => {
+        const match = createMatch();
+        const state = createReadyState(match);
+        state.reviewPending = new Set([itemKey(match)]);
+        expect(getControlView(state, 0)).toStrictEqual({
+            kind: 'level',
+            level: 'N3',
+            href: 'https://bunpro.jp/vocabs/%E9%A3%9F%E3%81%B9%E3%82%8B',
+        });
+    });
+
     test('an absent match renders nothing', () => {
         expect(getControlView(createReadyState(null), 0)).toStrictEqual({kind: 'none'});
     });

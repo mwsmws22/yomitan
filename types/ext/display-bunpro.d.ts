@@ -35,11 +35,22 @@ export type State =
         attempts: Map<Bunpro.ItemKey, AddAttempt>;
         /** True while that entry's Bunpro lookup has not finished. Entries settle from the top down. */
         pending?: boolean[];
+        /**
+         * Matches that have id/level/slug but are still waiting on hydrate for plus/check.
+         * Keys are `ItemKey` values.
+         */
+        reviewPending?: Set<Bunpro.ItemKey>;
     };
 
 export type ControlView =
     | {kind: 'none'}
     | {kind: 'reserved'}
+    | {
+        /** Level and open link only; plus/check appear after review hydrate. */
+        kind: 'level';
+        level: string | null;
+        href: string;
+    }
     | {
         kind: 'button';
         /** Plus offers an add. Check offers a remove. */

@@ -106,16 +106,23 @@ export class DisplayBunpro {
             return;
         }
 
-        for (let i = 0; i < queries.length; i++) {
-            applyQuery(state, entryQueries, queries[i], lookup.matches[i] ?? null);
-        }
-        this._render();
-
         /** @type {import('bunpro').BunproMatch[]} */
         const resolved = [];
-        for (const match of lookup.matches) {
-            if (match !== null) { resolved.push(match); }
+        /** @type {Set<import('bunpro').ItemKey>} */
+        const reviewPending = new Set();
+        for (let i = 0; i < queries.length; i++) {
+            const match = lookup.matches[i] ?? null;
+            applyQuery(state, entryQueries, queries[i], match);
+            if (match === null) { continue; }
+            resolved.push(match);
+            // Cached checks can show immediately; everything else waits on hydrate for the mark.
+            if (!match.inReviews) { reviewPending.add(itemKey(match)); }
         }
+        state.reviewPending = reviewPending;
+        this._render();
+        // Let the browser paint levels before the hydrate round-trip.
+        await yieldForPaint();
+        if (this._generation !== generation || this._state !== state) { return; }
         if (resolved.length === 0) { return; }
 
         /** @type {import('bunpro').BunproMatch[]} */
@@ -131,12 +138,15 @@ export class DisplayBunpro {
                 return;
             }
             log.error(e);
+            state.reviewPending = void 0;
+            this._render();
             return;
         }
         if (this._generation !== generation || this._state !== state) { return; }
         for (const match of hydrated) {
             state.items.set(itemKey(match), match);
         }
+        state.reviewPending = void 0;
         this._render();
     }
 
@@ -259,21 +269,26 @@ export class DisplayBunpro {
             level.hidden = view.level === null;
             level.textContent = view.level ?? '';
         }
-        status.hidden = view.mark === 'check';
-        added.hidden = view.mark !== 'check';
-        if (view.mark === 'plus') {
-            status.title = view.statusTitle;
-            status.setAttribute('aria-label', view.statusTitle);
-            status.disabled = view.busy;
-            if (!view.busy) {
-                this._eventListeners.addEventListener(status, 'click', this._onAddButtonClickBind);
-            }
+        if (view.kind === 'level') {
+            status.hidden = true;
+            added.hidden = true;
         } else {
-            added.title = view.statusTitle;
-            added.setAttribute('aria-label', view.statusTitle);
-            added.disabled = view.busy;
-            if (!view.busy) {
-                this._eventListeners.addEventListener(added, 'click', this._onRemoveButtonClickBind);
+            status.hidden = view.mark === 'check';
+            added.hidden = view.mark !== 'check';
+            if (view.mark === 'plus') {
+                status.title = view.statusTitle;
+                status.setAttribute('aria-label', view.statusTitle);
+                status.disabled = view.busy;
+                if (!view.busy) {
+                    this._eventListeners.addEventListener(status, 'click', this._onAddButtonClickBind);
+                }
+            } else {
+                added.title = view.statusTitle;
+                added.setAttribute('aria-label', view.statusTitle);
+                added.disabled = view.busy;
+                if (!view.busy) {
+                    this._eventListeners.addEventListener(added, 'click', this._onRemoveButtonClickBind);
+                }
             }
         }
         open.dataset.href = view.href;
@@ -282,6 +297,22 @@ export class DisplayBunpro {
         this._eventListeners.addEventListener(open, 'click', this._onOpenClickBind);
         return control;
     }
+}
+
+/**
+ * Double rAF so the level paint can land before hydrate blocks the main thread again.
+ * @returns {Promise<void>}
+ */
+function yieldForPaint() {
+    return new Promise((resolve) => {
+        if (typeof requestAnimationFrame !== 'function') {
+            setTimeout(resolve, 0);
+            return;
+        }
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => resolve());
+        });
+    });
 }
 
 /**
