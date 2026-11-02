@@ -488,6 +488,14 @@ export class API {
     }
 
     /**
+     * @param {import('api').ApiParam<'hydrateBunproMatches', 'matches'>} matches
+     * @returns {Promise<import('api').ApiReturn<'hydrateBunproMatches'>>}
+     */
+    hydrateBunproMatches(matches) {
+        return this._invoke('hydrateBunproMatches', {matches});
+    }
+
+    /**
      * @param {import('api').ApiParam<'addToBunpro', 'match'>} match
      * @returns {Promise<import('api').ApiReturn<'addToBunpro'>>}
      */

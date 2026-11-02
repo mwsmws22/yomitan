@@ -77,52 +77,67 @@ export class DisplayBunpro {
     }
 
     /**
+     * Resolve every unique query in one import/search wave, paint levels/links, then one hydrate for checks.
      * @param {symbol} generation
      * @param {Extract<import('display-bunpro').State, {phase: 'ready'}>} state
      * @param {(import('bunpro').BunproQuery | null)[]} entryQueries
      */
     async _settleFromTheTop(generation, state, entryQueries) {
         const queries = uniqueQueries(entryQueries);
-        /** @type {Map<number, import('bunpro').BunproMatch | null>} */
-        const arrived = new Map();
-        let next = 0;
+        if (queries.length === 0) { return; }
 
-        /**
-         * @param {number} index
-         * @param {import('bunpro').BunproMatch | null} match
-         */
-        const publish = (index, match) => {
+        /** @type {import('bunpro').BunproLookup} */
+        let lookup;
+        try {
+            lookup = await this._display.application.api.findBunproMatches(queries);
+        } catch (e) {
+            log.error(e);
             if (this._generation !== generation) { return; }
-            arrived.set(index, match);
-            while (arrived.has(next)) {
-                const settled = /** @type {import('bunpro').BunproMatch | null} */ (arrived.get(next));
-                arrived.delete(next);
-                applyQuery(state, entryQueries, queries[next], settled);
-                next += 1;
-                this._render();
+            for (const query of queries) {
+                applyQuery(state, entryQueries, query, null);
             }
-        };
+            this._render();
+            return;
+        }
+        if (this._generation !== generation) { return; }
+        if (lookup.status !== 'ready') {
+            this._generation = null;
+            this._setState({phase: 'unavailable', reason: lookup.status});
+            return;
+        }
 
-        await runFromTheTop(queries, async (query, index) => {
-            if (this._generation !== generation) { return; }
-            /** @type {import('bunpro').BunproLookup} */
-            let lookup;
-            try {
-                lookup = await this._display.application.api.findBunproMatches([query]);
-            } catch (e) {
-                log.error(e);
-                publish(index, null);
-                return;
-            }
-            if (lookup.status !== 'ready') {
+        for (let i = 0; i < queries.length; i++) {
+            applyQuery(state, entryQueries, queries[i], lookup.matches[i] ?? null);
+        }
+        this._render();
+
+        /** @type {import('bunpro').BunproMatch[]} */
+        const resolved = [];
+        for (const match of lookup.matches) {
+            if (match !== null) { resolved.push(match); }
+        }
+        if (resolved.length === 0) { return; }
+
+        /** @type {import('bunpro').BunproMatch[]} */
+        let hydrated;
+        try {
+            hydrated = await this._display.application.api.hydrateBunproMatches(resolved);
+        } catch (e) {
+            if (isSignedOutError(e)) {
                 if (this._generation === generation) {
                     this._generation = null;
-                    this._setState({phase: 'unavailable', reason: lookup.status});
+                    this._setState({phase: 'unavailable', reason: 'signedOut'});
                 }
                 return;
             }
-            publish(index, lookup.matches[0] ?? null);
-        });
+            log.error(e);
+            return;
+        }
+        if (this._generation !== generation || this._state !== state) { return; }
+        for (const match of hydrated) {
+            state.items.set(itemKey(match), match);
+        }
+        this._render();
     }
 
     /**
@@ -287,7 +302,38 @@ function openBunproPage(url) {
  */
 function getBunproQuery(dictionaryEntry) {
     const headword = getPrimaryHeadword(dictionaryEntry);
-    return headword.type === 'term' ? {term: headword.term, reading: headword.reading} : null;
+    if (headword.type !== 'term') { return null; }
+    /** @type {import('bunpro').BunproQuery} */
+    const query = {term: headword.term, reading: headword.reading};
+    if (dictionaryEntry.type === 'term') {
+        const jmdictId = termJmdictId(dictionaryEntry);
+        if (jmdictId !== null) { query.jmdictId = jmdictId; }
+    }
+    return query;
+}
+
+/**
+ * Positive shared JMdict sequence from the entry's definitions, or null.
+ * Same rule as Anki's sequence helper: disagreeing or missing sequences yield no id.
+ * @param {import('dictionary').TermDictionaryEntry} dictionaryEntry
+ * @returns {?number}
+ */
+function termJmdictId(dictionaryEntry) {
+    if (!dictionaryEntry.isPrimary) { return null; }
+    let hasSequence = false;
+    let mainSequence = -1;
+    for (const {sequences} of dictionaryEntry.definitions) {
+        const sequence = sequences[0];
+        if (!hasSequence) {
+            mainSequence = sequence;
+            hasSequence = true;
+            if (mainSequence === -1) { break; }
+        } else if (mainSequence !== sequence) {
+            mainSequence = -1;
+            break;
+        }
+    }
+    return mainSequence > 0 ? mainSequence : null;
 }
 
 /**
@@ -345,21 +391,3 @@ function applyQuery(state, entryQueries, query, match) {
     }
 }
 
-/**
- * Starts at the top query and keeps a few searches running. Results are published by the caller in order.
- * @template T
- * @param {T[]} items
- * @param {(item: T, index: number) => Promise<void>} run
- */
-async function runFromTheTop(items, run) {
-    const limit = 4;
-    let cursor = 0;
-    const worker = async () => {
-        while (cursor < items.length) {
-            const index = cursor;
-            cursor += 1;
-            await run(items[index], index);
-        }
-    };
-    await Promise.all(Array.from({length: Math.min(limit, items.length)}, worker));
-}

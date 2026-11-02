@@ -19,11 +19,10 @@ import {ExtensionError} from '../../core/extension-error.js';
 import {readResponseJson} from '../../core/json.js';
 import {hasPermissions} from '../../data/permissions-util.js';
 import {SIGNED_OUT_ERROR_CODE, isSignedOutError, itemKey, queryKey} from './bunpro-match.js';
-import {ADD_PATH, API_BASE, HYDRATE_PATH, USER_PATH, addBody, completeReviewIds, hydrateBody, isInReviews, parseVocabItem, pickExactMatch, removeBody, vocabPath} from './bunpro-protocol.js';
+import {ADD_PATH, API_BASE, HYDRATE_PATH, IMPORT_SEARCH_CHUNK, IMPORT_SEARCH_PATH, USER_PATH, addBody, completeReviewIds, hydrateBody, importSearchBody, isInReviews, parseImportSearchResponse, removeBody, reviewedItemKeys} from './bunpro-protocol.js';
 
 const TOKEN_COOKIE = {url: 'https://bunpro.jp/', name: 'frontend_api_token'};
 const TOKEN_STORAGE_KEY = 'bunproFrontendToken';
-const MAX_SEARCHES_IN_FLIGHT = 4;
 const SEARCH_TIMEOUT_MS = 8000;
 
 /**
@@ -62,8 +61,6 @@ class BunproClient {
         this._adds = new Map();
         /** @type {Map<import('bunpro').ItemKey, Promise<import('bunpro').BunproMatch>>} */
         this._removes = new Map();
-        /** @type {Map<string, Promise<void>>} */
-        this._searches = new Map();
     }
 
     /** @type {boolean} */
@@ -148,6 +145,7 @@ class BunproClient {
     }
 
     /**
+     * Resolves queries to Bunpro ids/slugs/levels via import/search. Does not hydrate review state.
      * @param {import('bunpro').BunproQuery[]} queries
      * @returns {Promise<import('bunpro').BunproLookup>}
      */
@@ -158,12 +156,33 @@ class BunproClient {
         const unresolved = [...new Map(queries.map((query) => [queryKey(query), query])).values()]
             .filter((query) => !this._resolutions.has(queryKey(query)));
         try {
-            await forEachLimited(unresolved, MAX_SEARCHES_IN_FLIGHT, (query) => this._resolve(session.cookie, query));
+            await this._resolveQueries(session.cookie, unresolved);
         } catch (e) {
             if (isSignedOutError(e)) { return {status: 'signedOut'}; }
             throw e;
         }
         return {status: 'ready', matches: queries.map((query) => this._lookup(query))};
+    }
+
+    /**
+     * One hydrate for every match; returns the same matches with `inReviews` updated.
+     * @param {import('bunpro').BunproMatch[]} matches
+     * @returns {Promise<import('bunpro').BunproMatch[]>}
+     */
+    async hydrateMatches(matches) {
+        const session = await this._getSession();
+        if (session.status !== 'ready') {
+            throw createNotReadyError(session.status);
+        }
+        if (matches.length === 0) { return []; }
+
+        const unique = [...new Map(matches.map((match) => [itemKey(match), match])).values()];
+        const payload = await this._request(session.cookie, HYDRATE_PATH, 'POST', hydrateBody(unique));
+        const reviewed = reviewedItemKeys(payload);
+        for (const match of unique) {
+            this._remember({...match, inReviews: reviewed.has(itemKey(match))});
+        }
+        return matches.map((match) => this._items.get(itemKey(match)) ?? match);
     }
 
     /**
@@ -257,41 +276,55 @@ class BunproClient {
     }
 
     /**
+     * Partition by JMdict id, import/search each mode in chunks of 30, remember hits without hydrating.
+     * A failed batch is not remembered, so the next lookup can try again.
      * @param {string} cookie
-     * @param {import('bunpro').BunproQuery} query
+     * @param {import('bunpro').BunproQuery[]} queries
      */
-    async _resolve(cookie, query) {
-        const key = queryKey(query);
-        if (this._resolutions.has(key)) { return; }
-        let pending = this._searches.get(key);
-        if (typeof pending === 'undefined') {
-            pending = this._searchOnce(cookie, query).finally(() => {
-                if (this._searches.get(key) === pending) { this._searches.delete(key); }
-            });
-            this._searches.set(key, pending);
-        }
-        await pending;
+    async _resolveQueries(cookie, queries) {
+        if (queries.length === 0) { return; }
+        const withId = queries.filter((query) => typeof query.jmdictId === 'number' && query.jmdictId > 0);
+        const withoutId = queries.filter((query) => typeof query.jmdictId !== 'number' || query.jmdictId <= 0);
+        await this._importSearchPartition(cookie, withId, true);
+        await this._importSearchPartition(cookie, withoutId, false);
     }
 
     /**
-     * A failed lookup is not remembered, so the next lookup can try again.
-     * An unknown slug is remembered: Bunpro answers that with HTTP 500.
      * @param {string} cookie
-     * @param {import('bunpro').BunproQuery} query
+     * @param {import('bunpro').BunproQuery[]} queries
+     * @param {boolean} isJmdictMode
      */
-    async _searchOnce(cookie, query) {
-        try {
-            const item = parseVocabItem(await this._get(cookie, vocabPath(query.term)));
-            const match = item === null ? null : pickExactMatch([item], query);
-            if (match === null) {
-                this._resolutions.set(queryKey(query), null);
-                return;
+    async _importSearchPartition(cookie, queries, isJmdictMode) {
+        for (let offset = 0; offset < queries.length; offset += IMPORT_SEARCH_CHUNK) {
+            const chunk = queries.slice(offset, offset + IMPORT_SEARCH_CHUNK);
+            try {
+                const payload = await this._request(cookie, IMPORT_SEARCH_PATH, 'POST', importSearchBody(chunk, isJmdictMode));
+                const matches = parseImportSearchResponse(payload, chunk, isJmdictMode);
+                for (let i = 0; i < chunk.length; i++) {
+                    this._rememberResolution(chunk[i], matches[i] ?? null);
+                }
+            } catch (e) {
+                if (isSignedOutError(e)) { throw e; }
+                // Soft failure: leave unresolved so a later call can retry.
             }
-            const reviewed = await this._withReviewState(cookie, match);
-            this._resolutions.set(queryKey(query), itemKey(reviewed));
-        } catch (e) {
-            if (isSignedOutError(e)) { throw e; }
         }
+    }
+
+    /**
+     * @param {import('bunpro').BunproQuery} query
+     * @param {?import('bunpro').BunproMatch} match
+     */
+    _rememberResolution(query, match) {
+        if (match === null) {
+            this._resolutions.set(queryKey(query), null);
+            return;
+        }
+        const known = this._items.get(itemKey(match));
+        const remembered = this._remember({
+            ...match,
+            inReviews: typeof known !== 'undefined' ? known.inReviews : false,
+        });
+        this._resolutions.set(queryKey(query), itemKey(remembered));
     }
 
     /**
@@ -311,21 +344,6 @@ class BunproClient {
     async _withReviewState(cookie, match) {
         const payload = await this._request(cookie, HYDRATE_PATH, 'POST', hydrateBody(match));
         return this._remember({...match, inReviews: isInReviews(payload)});
-    }
-
-    /**
-     * @param {string} cookie
-     * @param {string} path
-     * @returns {Promise<unknown>}
-     * @throws {Error}
-     */
-    async _get(cookie, path) {
-        const response = await this._send(cookie, path, 'GET');
-        if (response.status === 404 || response.status === 500) { return null; }
-        if (!response.ok) {
-            throw new Error(`Bunpro responded with HTTP status ${response.status}`);
-        }
-        return await readResponseJson(response);
     }
 
     /**
@@ -546,22 +564,6 @@ function authorization(status, {saved = false, offerBrowserLogin = false, token 
  */
 function blankToNull(value) {
     return typeof value === 'string' && value !== '' ? value : null;
-}
-
-/**
- * @template T
- * @param {T[]} items
- * @param {number} limit
- * @param {(item: T) => Promise<void>} run
- */
-async function forEachLimited(items, limit, run) {
-    let next = 0;
-    const worker = async () => {
-        while (next < items.length) {
-            await run(items[next++]);
-        }
-    };
-    await Promise.all(Array.from({length: Math.min(limit, items.length)}, worker));
 }
 
 /**

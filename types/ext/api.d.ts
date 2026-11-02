@@ -440,6 +440,12 @@ type ApiSurface = {
         };
         return: Bunpro.BunproLookup;
     };
+    hydrateBunproMatches: {
+        params: {
+            matches: Bunpro.BunproMatch[];
+        };
+        return: Bunpro.BunproMatch[];
+    };
     addToBunpro: {
         params: {
             match: Bunpro.BunproMatch;

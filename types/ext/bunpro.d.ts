@@ -22,11 +22,15 @@ export type ReviewableId = number & {readonly __brand: 'BunproReviewableId'};
 export type BunproQuery = {
     term: string;
     reading: string;
+    /** JMdict `ent_seq` when a sequenced dict (e.g. Jitendex) provided one; omit for term search. */
+    jmdictId?: number;
 };
 
 export type BunproMatch = {
     id: ReviewableId;
     kind: ReviewableKind;
+    /** Bunpro page slug (`barbed-wire`, `国`, …). */
+    slug: string;
     written: string;
     reading: string;
     level: string | null;

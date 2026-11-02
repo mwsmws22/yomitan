@@ -199,6 +199,7 @@ export class Backend {
             ['saveBunproToken',              this._onApiSaveBunproToken.bind(this)],
             ['clearBunproToken',             this._onApiClearBunproToken.bind(this)],
             ['findBunproMatches',            this._onApiFindBunproMatches.bind(this)],
+            ['hydrateBunproMatches',         this._onApiHydrateBunproMatches.bind(this)],
             ['addToBunpro',                  this._onApiAddToBunpro.bind(this)],
             ['removeFromBunpro',             this._onApiRemoveFromBunpro.bind(this)],
         ]);
@@ -1230,6 +1231,11 @@ export class Backend {
     /** @type {import('api').ApiHandler<'findBunproMatches'>} */
     async _onApiFindBunproMatches({queries}) {
         return await this._bunpro.findMatches(queries);
+    }
+
+    /** @type {import('api').ApiHandler<'hydrateBunproMatches'>} */
+    async _onApiHydrateBunproMatches({matches}) {
+        return await this._bunpro.hydrateMatches(matches);
     }
 
     /** @type {import('api').ApiHandler<'addToBunpro'>} */

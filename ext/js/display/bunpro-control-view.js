@@ -81,5 +81,5 @@ function createButtonView(mark, busy, match, statusTitle) {
  */
 function vocabPageUrl(match) {
     if (match.kind !== 'vocab') { return ''; }
-    return `https://bunpro.jp/vocabs/${encodeURIComponent(match.written)}`;
+    return `https://bunpro.jp/vocabs/${encodeURIComponent(match.slug)}`;
 }

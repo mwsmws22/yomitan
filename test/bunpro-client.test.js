@@ -20,6 +20,7 @@ import {createBunproClient} from '../ext/js/background/bunpro/bunpro-client.js';
 import {parseJson} from '../ext/js/core/json.js';
 
 const TABERU_QUERY = {term: '食べる', reading: 'たべる'};
+const TABERU_MATCH = {id: 101, kind: 'vocab', slug: '食べる', written: '食べる', reading: 'たべる', level: 'N5', inReviews: false};
 
 /**
  * @param {number} status
@@ -44,7 +45,7 @@ function reviewableIdFrom(body) {
 }
 
 /**
- * A stand-in for Bunpro's frontend API that knows one vocab, 食べる (id 101).
+ * Stand-in for Bunpro's frontend API that knows 食べる (101) and 有刺鉄線 / barbed-wire (32468).
  * @param {{validToken?: string, validTokens?: ?string[], failNextPatch?: boolean}} [setup]
  * @returns {{requests: {method: string, url: string, authorization: string, body: unknown}[], setCookie: (value: ?string) => void, setStored: (value: ?string) => void, stored: () => ?string, setCookiesPermission: (value: boolean) => void, methods: () => string[], client: ReturnType<typeof createBunproClient>}}
  */
@@ -59,6 +60,16 @@ function createFakeBunpro({validToken = 'token-a', validTokens = null, failNextP
     let cookiesPermission = true;
     const accepted = new Set(validTokens ?? [validToken]);
 
+    /** @type {Map<string, {id: number, slug: string, furigana: string, title: string, level: string}>} */
+    const byTerm = new Map([
+        ['食べる', {id: 101, slug: '食べる', furigana: '食（た）べる', title: '食べる', level: 'N5'}],
+        ['有刺鉄線', {id: 32468, slug: 'barbed-wire', furigana: '有刺鉄線（ゆうしてっせん）', title: '有刺鉄線', level: 'A20'}],
+    ]);
+    /** @type {Map<string, {id: number, slug: string, furigana: string, title: string, level: string}>} */
+    const byJmdict = new Map([
+        ['1628790', /** @type {{id: number, slug: string, furigana: string, title: string, level: string}} */ (byTerm.get('有刺鉄線'))],
+    ]);
+
     /** @type {import('bunpro').ClientPorts} */
     const ports = {
         fetch: async (url, init) => {
@@ -68,23 +79,45 @@ function createFakeBunpro({validToken = 'token-a', validTokens = null, failNextP
             requests.push({method, url, authorization, body});
             if (!accepted.has(authorization.slice('Token token='.length))) { return jsonResponse(401, {errors: [{code: 'unauthorized'}]}); }
             if (method === 'GET' && url.endsWith('/user')) { return jsonResponse(200, {}); }
-            if (method === 'GET') {
-                const slug = decodeURIComponent(url.split('/reviewables/vocab/')[1] ?? '');
-                if (slug !== '食べる') { return jsonResponse(500, {}); }
-                return jsonResponse(200, {
-                    data: {id: '101', type: 'vocab', attributes: {id: 101, furigana: '食（た）べる', level: 'N5'}},
+            if (method === 'POST' && url.endsWith('/decks/import/search')) {
+                const record = body !== null && typeof body === 'object' ? /** @type {{is_jmdict_mode?: boolean, queries?: {key: string, query: string}[]}} */ (body) : null;
+                const isJmdict = record?.is_jmdict_mode === true;
+                const results = (record?.queries ?? []).map((query) => {
+                    const hit = isJmdict ? byJmdict.get(query.query) : byTerm.get(query.query);
+                    if (typeof hit === 'undefined') {
+                        return {key: query.key, multiple_matches: false, base_attributes: {data: null}};
+                    }
+                    return {
+                        key: query.key,
+                        multiple_matches: false,
+                        base_attributes: {
+                            data: {
+                                id: String(hit.id),
+                                type: 'reviewable_base_attribute_mixed',
+                                attributes: {
+                                    id: hit.id,
+                                    slug: hit.slug,
+                                    furigana: hit.furigana,
+                                    title: hit.title,
+                                    level: hit.level,
+                                    type_pascal: 'Vocab',
+                                },
+                            },
+                        },
+                    };
                 });
+                return jsonResponse(200, {results});
             }
             if (method === 'PATCH') {
-                const record = body !== null && typeof body === 'object' ? /** @type {{action_type?: string, review_ids?: unknown}} */ (body) : null;
+                const record = body !== null && typeof body === 'object' ? /** @type {{action_type?: string, review_ids?: unknown, reviewables?: unknown}} */ (body) : null;
                 const action = record?.action_type;
+                const id = reviewableIdFrom(body) ?? 101;
                 if (action === 'remove') {
-                    // Mirror Bunpro: remove only lands when review_ids are present.
                     if (Array.isArray(record?.review_ids) && record.review_ids.length > 0) {
-                        reviewed.delete(101);
+                        reviewed.delete(id);
                     }
                 } else {
-                    reviewed.add(101);
+                    reviewed.add(id);
                 }
                 if (failPatch) {
                     failPatch = false;
@@ -92,11 +125,19 @@ function createFakeBunpro({validToken = 'token-a', validTokens = null, failNextP
                 }
                 return jsonResponse(200, {});
             }
-            const reviewableId = reviewableIdFrom(body);
-            const inReviews = typeof reviewableId === 'number' && reviewed.has(reviewableId);
-            return jsonResponse(200, {
-                data: inReviews ? [{id: '55', type: 'review', attributes: {id: 55, reviewable_id: reviewableId, reviewable_type: 'Vocab', complete: true}}] : [],
-            });
+            if (method === 'POST' && url.endsWith('/reviews/hydrate_reviewables')) {
+                const record = body !== null && typeof body === 'object' ? /** @type {{reviewables?: [string, number][]}} */ (body) : null;
+                const pairs = Array.isArray(record?.reviewables) ? record.reviewables : [];
+                const data = pairs
+                    .filter((pair) => Array.isArray(pair) && reviewed.has(pair[1]))
+                    .map((pair, index) => ({
+                        id: String(50 + index),
+                        type: 'review',
+                        attributes: {id: 50 + index, reviewable_id: pair[1], reviewable_type: pair[0], complete: true},
+                    }));
+                return jsonResponse(200, {data});
+            }
+            return jsonResponse(500, {});
         },
         readCookie: async () => cookie,
         hasCookiesPermission: async () => cookiesPermission,
@@ -125,16 +166,63 @@ function createFakeBunpro({validToken = 'token-a', validTokens = null, failNextP
 }
 
 describe('BunproClient.findMatches', () => {
-    test('returns the exact match per query and searches identical queries once', async () => {
+    test('batches import/search and leaves review state for hydrate', async () => {
         const bunpro = createFakeBunpro();
         const lookup = await bunpro.client.findMatches([TABERU_QUERY, {term: '食べ', reading: 'たべ'}, TABERU_QUERY]);
-        const taberu = {id: 101, kind: 'vocab', written: '食べる', reading: 'たべる', level: 'N5', inReviews: false};
-        expect(lookup).toStrictEqual({status: 'ready', matches: [taberu, null, taberu]});
+        expect(lookup).toStrictEqual({status: 'ready', matches: [TABERU_MATCH, null, TABERU_MATCH]});
         expect(bunpro.requests.map(({method, url, body}) => [method, url, body])).toStrictEqual([
-            ['GET', 'https://api.bunpro.jp/api/frontend/reviewables/vocab/%E9%A3%9F%E3%81%B9%E3%82%8B', null],
-            ['GET', 'https://api.bunpro.jp/api/frontend/reviewables/vocab/%E9%A3%9F%E3%81%B9', null],
-            ['POST', 'https://api.bunpro.jp/api/frontend/reviews/hydrate_reviewables', {reviewables: [['Vocab', 101]]}],
+            ['POST', 'https://api.bunpro.jp/api/frontend/decks/import/search', {
+                key: 'yomitan',
+                is_jmdict_mode: false,
+                queries: [
+                    {key: 'q0', reviewable_type: 'Vocab', query: '食べる'},
+                    {key: 'q1', reviewable_type: 'Vocab', query: '食べ'},
+                ],
+            }],
         ]);
+    });
+
+    test('JMdict ids and leftover terms use separate import/search partitions', async () => {
+        const bunpro = createFakeBunpro();
+        const lookup = await bunpro.client.findMatches([
+            {term: '有刺鉄線', reading: 'ゆうしてっせん', jmdictId: 1628790},
+            TABERU_QUERY,
+        ]);
+        expect(lookup).toStrictEqual({
+            status: 'ready',
+            matches: [
+                {id: 32468, kind: 'vocab', slug: 'barbed-wire', written: '有刺鉄線', reading: 'ゆうしてっせん', level: 'A20', inReviews: false},
+                TABERU_MATCH,
+            ],
+        });
+        expect(bunpro.requests.map(({body}) => body)).toStrictEqual([
+            {
+                key: 'yomitan',
+                is_jmdict_mode: true,
+                queries: [{key: 'q0', reviewable_type: 'Vocab', query: '1628790'}],
+            },
+            {
+                key: 'yomitan',
+                is_jmdict_mode: false,
+                queries: [{key: 'q0', reviewable_type: 'Vocab', query: '食べる'}],
+            },
+        ]);
+    });
+
+    test('hydrateMatches marks complete reviews in one call', async () => {
+        const bunpro = createFakeBunpro();
+        const lookup = await bunpro.client.findMatches([TABERU_QUERY, {term: '有刺鉄線', reading: 'ゆうしてっせん', jmdictId: 1628790}]);
+        if (lookup.status !== 'ready' || lookup.matches[0] === null || lookup.matches[1] === null) {
+            throw new Error('expected matches');
+        }
+        await bunpro.client.add(lookup.matches[0]);
+        const hydrated = await bunpro.client.hydrateMatches([lookup.matches[0], lookup.matches[1]]);
+        expect(hydrated.map(({id, inReviews}) => [id, inReviews])).toStrictEqual([[101, true], [32468, false]]);
+        expect(bunpro.requests.at(-1)).toMatchObject({
+            method: 'POST',
+            url: 'https://api.bunpro.jp/api/frontend/reviews/hydrate_reviewables',
+            body: {reviewables: [['Vocab', 101], ['Vocab', 32468]]},
+        });
     });
 
     test('reports disabled without touching the network', async () => {
@@ -154,12 +242,13 @@ describe('BunproClient.add', () => {
 
         const added = await bunpro.client.add(match);
         expect(added).toStrictEqual({...match, inReviews: true});
-        expect(bunpro.requests.slice(2).map(({method, body}) => [method, body])).toStrictEqual([
+        // Known from findMatches: skip the pre-add hydrate and PATCH once.
+        expect(bunpro.requests.slice(1).map(({method, body}) => [method, body])).toStrictEqual([
             ['PATCH', {action_type: 'add', deck_id: null, reviewables: [['Vocab', 101]]}],
         ]);
 
         expect(await bunpro.client.add(match)).toStrictEqual({...match, inReviews: true});
-        expect(bunpro.methods()).toStrictEqual(['GET', 'POST', 'PATCH']);
+        expect(bunpro.methods()).toStrictEqual(['POST', 'PATCH']);
         expect(await bunpro.client.findMatches([TABERU_QUERY])).toStrictEqual({status: 'ready', matches: [{...match, inReviews: true}]});
     });
 
@@ -171,12 +260,12 @@ describe('BunproClient.add', () => {
 
         const results = await Promise.all([bunpro.client.add(match), bunpro.client.add(match)]);
         expect(results.map(({inReviews}) => inReviews)).toStrictEqual([true, true]);
-        expect(bunpro.methods()).toStrictEqual(['GET', 'POST', 'PATCH']);
+        expect(bunpro.methods()).toStrictEqual(['POST', 'PATCH']);
     });
 
     test('an unknown match is checked for an existing review first', async () => {
         const bunpro = createFakeBunpro();
-        const match = /** @type {import('bunpro').BunproMatch} */ ({id: 101, kind: 'vocab', written: '食べる', reading: 'たべる', level: 'N5', inReviews: false});
+        const match = /** @type {import('bunpro').BunproMatch} */ ({...TABERU_MATCH});
         expect(await bunpro.client.add(match)).toStrictEqual({...match, inReviews: true});
         expect(bunpro.methods()).toStrictEqual(['POST', 'PATCH']);
     });
@@ -187,7 +276,7 @@ describe('BunproClient.add', () => {
         if (lookup.status !== 'ready' || lookup.matches[0] === null) { throw new Error('expected a match'); }
 
         expect((await bunpro.client.add(lookup.matches[0])).inReviews).toStrictEqual(true);
-        expect(bunpro.methods()).toStrictEqual(['GET', 'POST', 'PATCH', 'POST']);
+        expect(bunpro.methods()).toStrictEqual(['POST', 'PATCH', 'POST']);
     });
 });
 
@@ -202,11 +291,10 @@ describe('BunproClient.remove', () => {
         expect(removed).toStrictEqual({...match, inReviews: false});
         expect(bunpro.requests.at(-1)).toMatchObject({
             method: 'PATCH',
-            body: {action_type: 'remove', deck_id: null, reviewables: [['Vocab', 101]], review_ids: [55]},
+            body: {action_type: 'remove', deck_id: null, reviewables: [['Vocab', 101]], review_ids: [50]},
         });
 
         expect(await bunpro.client.remove(match)).toStrictEqual({...match, inReviews: false});
-        // Second remove hydrates, sees nothing complete, and skips the remove PATCH.
         expect(bunpro.requests.filter(({method, body}) => (
             method === 'PATCH' && body !== null && typeof body === 'object' && /** @type {{action_type?: string}} */ (body).action_type === 'remove'
         )).length).toStrictEqual(1);
@@ -254,15 +342,14 @@ describe('BunproClient sign-in', () => {
 
         bunpro.setCookie('token-b');
         await bunpro.client.findMatches([TABERU_QUERY]);
-        // Without dropping the cache, the second account would reuse A's resolution and send nothing.
         expect(bunpro.requests.length).toBeGreaterThan(requestCount);
-        expect(bunpro.requests.slice(requestCount).map(({method}) => method)).toContain('GET');
+        expect(bunpro.requests.slice(requestCount).map(({method}) => method)).toContain('POST');
     });
 
     test('an add rejected with 401 throws the signed-out error', async () => {
         const bunpro = createFakeBunpro({validToken: 'token-b'});
         bunpro.setCookie('token-a');
-        const match = /** @type {import('bunpro').BunproMatch} */ ({id: 101, kind: 'vocab', written: '食べる', reading: 'たべる', level: 'N5', inReviews: false});
+        const match = /** @type {import('bunpro').BunproMatch} */ ({...TABERU_MATCH});
         await expect(bunpro.client.add(match)).rejects.toMatchObject({data: {code: 'bunpro-signed-out'}});
         expect(await bunpro.client.getStatus()).toStrictEqual('signedOut');
     });
@@ -369,7 +456,7 @@ describe('BunproClient saved token', () => {
                         init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
                     });
                 }
-                return Promise.resolve(jsonResponse(200, {}));
+                return Promise.resolve(jsonResponse(200, {results: []}));
             },
             readCookie: async () => 'token-a',
             hasCookiesPermission: async () => true,

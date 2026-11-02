@@ -24,7 +24,17 @@ import {getControlView} from '../ext/js/display/bunpro-control-view.js';
  * @returns {import('bunpro').BunproMatch}
  */
 function createMatch(fields = {}) {
-    return /** @type {import('bunpro').BunproMatch} */ ({id: 101, kind: 'vocab', written: '食べる', reading: 'たべる', level: 'N3', inReviews: false, ...fields});
+    const written = fields.written ?? '食べる';
+    return /** @type {import('bunpro').BunproMatch} */ ({
+        id: 101,
+        kind: 'vocab',
+        written,
+        reading: 'たべる',
+        level: 'N3',
+        inReviews: false,
+        ...fields,
+        slug: fields.slug ?? written,
+    });
 }
 
 /**
@@ -136,6 +146,23 @@ describe('getControlView', () => {
             level: null,
             statusTitle: 'Add to Bunpro reviews',
             href: 'https://bunpro.jp/vocabs/%E9%A3%9F%E3%81%B9%E3%82%8B',
+        });
+    });
+
+    test('an English Bunpro slug opens that page, not the Japanese written form', () => {
+        expect(getControlView(createReadyState(createMatch({
+            id: 32468,
+            slug: 'barbed-wire',
+            written: '有刺鉄線',
+            reading: 'ゆうしてっせん',
+            level: 'A20',
+        })), 0)).toStrictEqual({
+            kind: 'button',
+            mark: 'plus',
+            busy: false,
+            level: 'A20',
+            statusTitle: 'Add to Bunpro reviews',
+            href: 'https://bunpro.jp/vocabs/barbed-wire',
         });
     });
 

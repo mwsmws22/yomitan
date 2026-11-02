@@ -19,20 +19,16 @@ export const API_BASE = 'https://api.bunpro.jp/api/frontend';
 
 export const SEARCH_PATH = '/search/reviewables_v1_1';
 
+export const IMPORT_SEARCH_PATH = '/decks/import/search';
+
+/** Bunpro accepts at most this many queries per import/search request. */
+export const IMPORT_SEARCH_CHUNK = 30;
+
 export const ADD_PATH = '/reviews/update_via_action_type';
 
 export const HYDRATE_PATH = '/reviews/hydrate_reviewables';
 
 export const USER_PATH = '/user';
-
-/**
- * The vocab page slug is the written form, as in `/vocabs/国`.
- * @param {string} term
- * @returns {string}
- */
-export function vocabPath(term) {
-    return `/reviewables/vocab/${encodeURIComponent(term)}`;
-}
 
 /** @type {Readonly<Record<import('bunpro').ReviewableKind, import('bunpro').KindWire>>} */
 export const KIND = Object.freeze({
@@ -96,11 +92,14 @@ function reviewActionBody(match, actionType) {
 }
 
 /**
- * @param {import('bunpro').BunproMatch} match
+ * @param {import('bunpro').BunproMatch|import('bunpro').BunproMatch[]} matchOrMatches
  * @returns {import('core').SerializableObject}
  */
-export function hydrateBody(match) {
-    return {reviewables: reviewablePair(match)};
+export function hydrateBody(matchOrMatches) {
+    const matches = Array.isArray(matchOrMatches) ? matchOrMatches : [matchOrMatches];
+    return {
+        reviewables: matches.map((match) => /** @type {[string, import('bunpro').ReviewableId]} */ ([KIND[match.kind].reviewable, match.id])),
+    };
 }
 
 /**
@@ -109,6 +108,84 @@ export function hydrateBody(match) {
  */
 function reviewablePair(match) {
     return [[KIND[match.kind].reviewable, match.id]];
+}
+
+/**
+ * One import/search body. `is_jmdict_mode` applies to every query in the chunk.
+ * @param {import('bunpro').BunproQuery[]} queries
+ * @param {boolean} isJmdictMode
+ * @returns {import('core').SerializableObject}
+ */
+export function importSearchBody(queries, isJmdictMode) {
+    return {
+        key: 'yomitan',
+        is_jmdict_mode: isJmdictMode,
+        queries: queries.map((query, index) => ({
+            key: `q${index}`,
+            reviewable_type: 'Vocab',
+            query: isJmdictMode ? String(query.jmdictId) : query.term,
+        })),
+    };
+}
+
+/**
+ * @param {unknown} payload
+ * @param {import('bunpro').BunproQuery[]} queries
+ * @param {boolean} isJmdictMode
+ * @returns {(?import('bunpro').BunproMatch)[]}
+ */
+export function parseImportSearchResponse(payload, queries, isJmdictMode) {
+    const response = asObject(payload);
+    const results = response === null || !Array.isArray(response.results) ? [] : response.results;
+    /** @type {Map<string, ?import('bunpro').BunproMatch>} */
+    const byKey = new Map();
+    for (const item of results) {
+        const row = asObject(item);
+        if (row === null || typeof row.key !== 'string') { continue; }
+        const match = parseImportSearchResult(row);
+        if (match === null) {
+            byKey.set(row.key, null);
+            continue;
+        }
+        const index = Number(row.key.slice(1));
+        const query = Number.isInteger(index) ? queries[index] : null;
+        if (query === null) {
+            byKey.set(row.key, null);
+            continue;
+        }
+        byKey.set(row.key, isJmdictMode ? match : pickExactMatch([match], query));
+    }
+    return queries.map((_, index) => byKey.get(`q${index}`) ?? null);
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @returns {?import('bunpro').BunproMatch}
+ */
+function parseImportSearchResult(row) {
+    const base = asObject(row.base_attributes);
+    const data = base === null ? null : asObject(base.data);
+    if (data === null) { return null; }
+    const attributes = asObject(data.attributes);
+    if (attributes === null) { return null; }
+    if (attributes.type_pascal !== 'Vocab' && typeof attributes.type_pascal !== 'undefined') { return null; }
+    const id = parseReviewableId(typeof attributes.id === 'number' ? attributes.id : Number(data.id));
+    if (id === null) { return null; }
+    const furigana = typeof attributes.furigana === 'string' ? attributes.furigana : '';
+    const title = typeof attributes.title === 'string' ? attributes.title : '';
+    const written = title !== '' ? title : (furigana !== '' ? furiganaToWritten(furigana) : '');
+    if (written === '') { return null; }
+    const reading = furigana !== '' ? furiganaToReading(furigana) : written;
+    const slug = typeof attributes.slug === 'string' && attributes.slug !== '' ? attributes.slug : written;
+    return {
+        id,
+        kind: 'vocab',
+        slug,
+        written,
+        reading,
+        level: parseLevel(attributes),
+        inReviews: false,
+    };
 }
 
 /**
@@ -232,14 +309,40 @@ function parseRecord(kind, record, reviews) {
     const id = parseReviewableId(typeof attributes.id === 'number' ? attributes.id : Number(record.id));
     const furigana = attributes.furigana;
     if (id === null || typeof furigana !== 'string' || furigana === '') { return null; }
+    const written = furiganaToWritten(furigana);
+    const slug = typeof attributes.slug === 'string' && attributes.slug !== '' ? attributes.slug : written;
     return {
         id,
         kind,
-        written: furiganaToWritten(furigana),
+        slug,
+        written,
         reading: furiganaToReading(furigana),
         level: parseLevel(attributes),
         inReviews: reviews.some((review) => isReviewOf(review, kind, id)),
     };
+}
+
+/**
+ * Item keys (`vocab:123`) of hydrate rows Bunpro treats as currently in reviews.
+ * @param {unknown} payload
+ * @returns {Set<import('bunpro').ItemKey>}
+ */
+export function reviewedItemKeys(payload) {
+    const response = asObject(payload);
+    /** @type {Set<import('bunpro').ItemKey>} */
+    const keys = new Set();
+    if (response === null) { return keys; }
+    for (const record of recordsOf(response.data)) {
+        if (record.type !== 'review' && typeof record.type !== 'undefined') { continue; }
+        const attributes = asObject(record.attributes);
+        if (attributes === null || attributes.complete !== true) { continue; }
+        const id = parseReviewableId(Number(attributes.reviewable_id));
+        if (id === null) { continue; }
+        const type = attributes.reviewable_type;
+        const kind = type === KIND.grammar.reviewable ? 'grammar' : 'vocab';
+        keys.add(/** @type {import('bunpro').ItemKey} */ (`${kind}:${id}`));
+    }
+    return keys;
 }
 
 /**
