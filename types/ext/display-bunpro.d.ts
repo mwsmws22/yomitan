@@ -51,4 +51,6 @@ export type ControlView =
         statusTitle: string;
         /** Vocab page for this item. Empty when the match is not a vocab slug. */
         href: string;
+        /** Colors the Bunpro mark once study questions are classified. */
+        studyMode: Bunpro.StudyMode | null;
     };

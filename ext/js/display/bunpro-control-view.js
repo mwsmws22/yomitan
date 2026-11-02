@@ -72,7 +72,15 @@ function getMatchView({entryItems, items, attempts, pending}, entryIndex) {
  * @returns {import('display-bunpro').ControlView}
  */
 function createButtonView(mark, busy, match, statusTitle) {
-    return {kind: 'button', mark, busy, level: match.level, statusTitle, href: vocabPageUrl(match)};
+    return {
+        kind: 'button',
+        mark,
+        busy,
+        level: match.level,
+        statusTitle,
+        href: vocabPageUrl(match),
+        studyMode: match.studyMode ?? null,
+    };
 }
 
 /**

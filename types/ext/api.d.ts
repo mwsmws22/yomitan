@@ -446,6 +446,12 @@ type ApiSurface = {
         };
         return: Bunpro.BunproMatch[];
     };
+    classifyBunproStudyMode: {
+        params: {
+            match: Bunpro.BunproMatch;
+        };
+        return: Bunpro.BunproMatch;
+    };
     addToBunpro: {
         params: {
             match: Bunpro.BunproMatch;

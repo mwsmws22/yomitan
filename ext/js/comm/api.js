@@ -496,6 +496,14 @@ export class API {
     }
 
     /**
+     * @param {import('api').ApiParam<'classifyBunproStudyMode', 'match'>} match
+     * @returns {Promise<import('api').ApiReturn<'classifyBunproStudyMode'>>}
+     */
+    classifyBunproStudyMode(match) {
+        return this._invoke('classifyBunproStudyMode', {match});
+    }
+
+    /**
      * @param {import('api').ApiParam<'addToBunpro', 'match'>} match
      * @returns {Promise<import('api').ApiReturn<'addToBunpro'>>}
      */

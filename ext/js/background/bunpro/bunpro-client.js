@@ -19,7 +19,7 @@ import {ExtensionError} from '../../core/extension-error.js';
 import {readResponseJson} from '../../core/json.js';
 import {hasPermissions} from '../../data/permissions-util.js';
 import {SIGNED_OUT_ERROR_CODE, isSignedOutError, itemKey, queryKey} from './bunpro-match.js';
-import {ADD_PATH, API_BASE, HYDRATE_PATH, IMPORT_SEARCH_CHUNK, IMPORT_SEARCH_PATH, USER_PATH, addBody, completeReviewIds, hydrateBody, importSearchBody, isInReviews, parseImportSearchResponse, removeBody, reviewedItemKeys} from './bunpro-protocol.js';
+import {ADD_PATH, API_BASE, HYDRATE_PATH, IMPORT_SEARCH_CHUNK, IMPORT_SEARCH_PATH, USER_PATH, addBody, completeReviewIds, hydrateBody, importSearchBody, isInReviews, parseImportSearchResponse, parseStudyMode, removeBody, reviewedItemKeys, vocabPath} from './bunpro-protocol.js';
 
 const TOKEN_COOKIE = {url: 'https://bunpro.jp/', name: 'frontend_api_token'};
 const TOKEN_STORAGE_KEY = 'bunproFrontendToken';
@@ -186,6 +186,33 @@ class BunproClient {
     }
 
     /**
+     * Loads study questions for one vocab and remembers cloze / sentences / translation.
+     * @param {import('bunpro').BunproMatch} match
+     * @returns {Promise<import('bunpro').BunproMatch>}
+     */
+    async classifyStudyMode(match) {
+        const key = itemKey(match);
+        const known = this._items.get(key);
+        if (typeof known !== 'undefined' && (known.studyMode === 'cloze' || known.studyMode === 'sentences' || known.studyMode === 'translation')) {
+            return known;
+        }
+        const session = await this._getSession();
+        if (session.status !== 'ready') {
+            throw createNotReadyError(session.status);
+        }
+        try {
+            const payload = await this._get(session.cookie, vocabPath(match.id));
+            const studyMode = payload === null ? 'translation' : parseStudyMode(payload);
+            const base = typeof known !== 'undefined' ? known : match;
+            return this._remember({...base, studyMode});
+        } catch (e) {
+            if (isSignedOutError(e)) { throw e; }
+            const base = typeof known !== 'undefined' ? known : match;
+            return this._remember({...base, studyMode: 'translation'});
+        }
+    }
+
+    /**
      * Safe to repeat: an item already in reviews, or already being added, is not sent again.
      * @param {import('bunpro').BunproMatch} match
      * @returns {Promise<import('bunpro').BunproMatch>}
@@ -349,6 +376,21 @@ class BunproClient {
     /**
      * @param {string} cookie
      * @param {string} path
+     * @returns {Promise<unknown>}
+     * @throws {Error}
+     */
+    async _get(cookie, path) {
+        const response = await this._send(cookie, path, 'GET');
+        if (response.status === 404 || response.status === 500) { return null; }
+        if (!response.ok) {
+            throw new Error(`Bunpro responded with HTTP status ${response.status}`);
+        }
+        return await readResponseJson(response);
+    }
+
+    /**
+     * @param {string} cookie
+     * @param {string} path
      * @param {'POST'|'PATCH'} method
      * @param {import('core').SerializableObject} body
      * @returns {Promise<unknown>}
@@ -499,8 +541,16 @@ class BunproClient {
      * @returns {import('bunpro').BunproMatch}
      */
     _remember(match) {
-        this._items.set(itemKey(match), match);
-        return match;
+        const key = itemKey(match);
+        const previous = this._items.get(key);
+        const studyMode = (
+            match.studyMode === 'cloze' || match.studyMode === 'sentences' || match.studyMode === 'translation' ?
+            match.studyMode :
+            (typeof previous !== 'undefined' ? previous.studyMode : null)
+        );
+        const remembered = {...match, studyMode: studyMode ?? null};
+        this._items.set(key, remembered);
+        return remembered;
     }
 
     /** */

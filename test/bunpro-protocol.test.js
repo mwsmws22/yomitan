@@ -16,7 +16,7 @@
  */
 
 import {describe, expect, test} from 'vitest';
-import {addBody, completeReviewIds, hydrateBody, importSearchBody, isInReviews, parseImportSearchResponse, parseSearchResponse, parseVocabItem, pickExactMatch, removeBody, reviewedItemKeys} from '../ext/js/background/bunpro/bunpro-protocol.js';
+import {addBody, completeReviewIds, hydrateBody, importSearchBody, isInReviews, parseImportSearchResponse, parseSearchResponse, parseStudyMode, parseVocabItem, pickExactMatch, removeBody, reviewedItemKeys} from '../ext/js/background/bunpro/bunpro-protocol.js';
 
 const SEARCH_RESPONSE = {
     vocabs: {
@@ -172,6 +172,31 @@ describe('parseImportSearchResponse', () => {
                 },
             }],
         }, queries, false)).toStrictEqual([null]);
+    });
+});
+
+describe('parseStudyMode', () => {
+    test('cloze wins when any study question is cloze', () => {
+        expect(parseStudyMode({
+            included: [
+                {type: 'study_question', attributes: {question_type: 'readonly'}},
+                {type: 'study_question', attributes: {question_type: 'cloze'}},
+            ],
+        })).toStrictEqual('cloze');
+    });
+
+    test('readonly-only questions are sentences', () => {
+        expect(parseStudyMode({
+            included: [
+                {type: 'study_question', attributes: {question_type: 'readonly'}},
+                {type: 'study_question', attributes: {question_type: 'readonly'}},
+            ],
+        })).toStrictEqual('sentences');
+    });
+
+    test('no study questions means translation-only', () => {
+        expect(parseStudyMode({included: []})).toStrictEqual('translation');
+        expect(parseStudyMode({})).toStrictEqual('translation');
     });
 });
 

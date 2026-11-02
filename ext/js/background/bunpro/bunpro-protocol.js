@@ -30,6 +30,15 @@ export const HYDRATE_PATH = '/reviews/hydrate_reviewables';
 
 export const USER_PATH = '/user';
 
+/**
+ * Vocab detail by numeric id or page slug.
+ * @param {string|number} idOrSlug
+ * @returns {string}
+ */
+export function vocabPath(idOrSlug) {
+    return `/reviewables/vocab/${encodeURIComponent(String(idOrSlug))}`;
+}
+
 /** @type {Readonly<Record<import('bunpro').ReviewableKind, import('bunpro').KindWire>>} */
 export const KIND = Object.freeze({
     vocab: {searchKey: 'vocabs', recordType: 'vocab', reviewable: 'Vocab'},
@@ -197,6 +206,27 @@ export function parseVocabItem(payload) {
     const data = response === null ? null : asObject(response.data);
     if (data === null) { return null; }
     return parseRecord('vocab', data, []);
+}
+
+/**
+ * Cloze if any included study question is cloze; sentences if only readonly (or other non-cloze);
+ * translation when there are no study questions.
+ * @param {unknown} payload
+ * @returns {import('bunpro').StudyMode}
+ */
+export function parseStudyMode(payload) {
+    const response = asObject(payload);
+    if (response === null) { return 'translation'; }
+    let hasQuestion = false;
+    for (const record of recordsOf(response.included)) {
+        if (record.type !== 'study_question') { continue; }
+        hasQuestion = true;
+        const attributes = asObject(record.attributes);
+        if (attributes !== null && attributes.question_type === 'cloze') {
+            return 'cloze';
+        }
+    }
+    return hasQuestion ? 'sentences' : 'translation';
 }
 
 /**

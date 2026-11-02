@@ -138,6 +138,27 @@ export class DisplayBunpro {
             state.items.set(itemKey(match), match);
         }
         this._render();
+
+        // After levels + reviews are visible, classify study mode one-by-one and paint as each returns.
+        for (const match of hydrated) {
+            if (this._generation !== generation || this._state !== state) { return; }
+            try {
+                const classified = await this._display.application.api.classifyBunproStudyMode(match);
+                if (this._generation !== generation || this._state !== state) { return; }
+                state.items.set(itemKey(classified), classified);
+                this._render();
+                await yieldForPaint();
+            } catch (e) {
+                if (isSignedOutError(e)) {
+                    if (this._generation === generation) {
+                        this._generation = null;
+                        this._setState({phase: 'unavailable', reason: 'signedOut'});
+                    }
+                    return;
+                }
+                log.error(e);
+            }
+        }
     }
 
     /**
@@ -251,6 +272,9 @@ export class DisplayBunpro {
             control.dataset.reserved = 'true';
             return control;
         }
+        if (view.studyMode !== null) {
+            control.dataset.studyMode = view.studyMode;
+        }
         const status = /** @type {HTMLButtonElement} */ (control.querySelector('.bunpro-status'));
         const added = /** @type {HTMLButtonElement} */ (control.querySelector('.bunpro-added'));
         const open = /** @type {HTMLButtonElement} */ (control.querySelector('.bunpro-open'));
@@ -282,6 +306,22 @@ export class DisplayBunpro {
         this._eventListeners.addEventListener(open, 'click', this._onOpenClickBind);
         return control;
     }
+}
+
+/**
+ * Let the browser paint between sequential study-mode updates.
+ * @returns {Promise<void>}
+ */
+function yieldForPaint() {
+    return new Promise((resolve) => {
+        if (typeof requestAnimationFrame !== 'function') {
+            setTimeout(resolve, 0);
+            return;
+        }
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => resolve());
+        });
+    });
 }
 
 /**

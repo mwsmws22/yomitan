@@ -32,6 +32,7 @@ function createMatch(fields = {}) {
         reading: 'たべる',
         level: 'N3',
         inReviews: false,
+        studyMode: null,
         ...fields,
         slug: fields.slug ?? written,
     });
@@ -80,6 +81,7 @@ describe('getControlView', () => {
             level: 'N3',
             statusTitle: 'Add to Bunpro reviews',
             href: 'https://bunpro.jp/vocabs/%E9%A3%9F%E3%81%B9%E3%82%8B',
+            studyMode: null,
         });
     });
 
@@ -91,6 +93,7 @@ describe('getControlView', () => {
             level: 'N3',
             statusTitle: 'Adding to Bunpro reviews',
             href: 'https://bunpro.jp/vocabs/%E9%A3%9F%E3%81%B9%E3%82%8B',
+            studyMode: null,
         });
     });
 
@@ -102,6 +105,7 @@ describe('getControlView', () => {
             level: 'N3',
             statusTitle: 'Bunpro responded with HTTP status 502',
             href: 'https://bunpro.jp/vocabs/%E9%A3%9F%E3%81%B9%E3%82%8B',
+            studyMode: null,
         });
     });
 
@@ -113,6 +117,7 @@ describe('getControlView', () => {
             level: 'N3',
             statusTitle: 'Remove from Bunpro reviews',
             href: 'https://bunpro.jp/vocabs/%E9%A3%9F%E3%81%B9%E3%82%8B',
+            studyMode: null,
         });
     });
 
@@ -124,6 +129,7 @@ describe('getControlView', () => {
             level: 'N3',
             statusTitle: 'Removing from Bunpro reviews',
             href: 'https://bunpro.jp/vocabs/%E9%A3%9F%E3%81%B9%E3%82%8B',
+            studyMode: null,
         });
     });
 
@@ -135,6 +141,7 @@ describe('getControlView', () => {
             level: 'N3',
             statusTitle: 'Bunpro responded with HTTP status 502',
             href: 'https://bunpro.jp/vocabs/%E9%A3%9F%E3%81%B9%E3%82%8B',
+            studyMode: null,
         });
     });
 
@@ -146,6 +153,7 @@ describe('getControlView', () => {
             level: null,
             statusTitle: 'Add to Bunpro reviews',
             href: 'https://bunpro.jp/vocabs/%E9%A3%9F%E3%81%B9%E3%82%8B',
+            studyMode: null,
         });
     });
 
@@ -163,6 +171,14 @@ describe('getControlView', () => {
             level: 'A20',
             statusTitle: 'Add to Bunpro reviews',
             href: 'https://bunpro.jp/vocabs/barbed-wire',
+            studyMode: null,
+        });
+    });
+
+    test('a cloze match exposes studyMode for the red Bunpro mark', () => {
+        expect(getControlView(createReadyState(createMatch({studyMode: 'cloze'})), 0)).toMatchObject({
+            kind: 'button',
+            studyMode: 'cloze',
         });
     });
 

@@ -20,7 +20,7 @@ import {createBunproClient} from '../ext/js/background/bunpro/bunpro-client.js';
 import {parseJson} from '../ext/js/core/json.js';
 
 const TABERU_QUERY = {term: '食べる', reading: 'たべる'};
-const TABERU_MATCH = {id: 101, kind: 'vocab', slug: '食べる', written: '食べる', reading: 'たべる', level: 'N5', inReviews: false};
+const TABERU_MATCH = {id: 101, kind: 'vocab', slug: '食べる', written: '食べる', reading: 'たべる', level: 'N5', inReviews: false, studyMode: null};
 
 /**
  * @param {number} status
@@ -79,6 +79,22 @@ function createFakeBunpro({validToken = 'token-a', validTokens = null, failNextP
             requests.push({method, url, authorization, body});
             if (!accepted.has(authorization.slice('Token token='.length))) { return jsonResponse(401, {errors: [{code: 'unauthorized'}]}); }
             if (method === 'GET' && url.endsWith('/user')) { return jsonResponse(200, {}); }
+            if (method === 'GET' && url.includes('/reviewables/vocab/')) {
+                const id = decodeURIComponent(url.split('/reviewables/vocab/')[1] ?? '');
+                if (id === '101' || id === '食べる') {
+                    return jsonResponse(200, {
+                        data: {id: '101', type: 'vocab', attributes: {id: 101, furigana: '食（た）べる', level: 'N5', slug: '食べる'}},
+                        included: [{type: 'study_question', attributes: {question_type: 'cloze'}}],
+                    });
+                }
+                if (id === '32468') {
+                    return jsonResponse(200, {
+                        data: {id: '32468', type: 'vocab', attributes: {id: 32468, furigana: '有刺鉄線（ゆうしてっせん）', level: 'A20', slug: 'barbed-wire'}},
+                        included: [],
+                    });
+                }
+                return jsonResponse(500, {});
+            }
             if (method === 'POST' && url.endsWith('/decks/import/search')) {
                 const record = body !== null && typeof body === 'object' ? /** @type {{is_jmdict_mode?: boolean, queries?: {key: string, query: string}[]}} */ (body) : null;
                 const isJmdict = record?.is_jmdict_mode === true;
@@ -191,7 +207,7 @@ describe('BunproClient.findMatches', () => {
         expect(lookup).toStrictEqual({
             status: 'ready',
             matches: [
-                {id: 32468, kind: 'vocab', slug: 'barbed-wire', written: '有刺鉄線', reading: 'ゆうしてっせん', level: 'A20', inReviews: false},
+                {id: 32468, kind: 'vocab', slug: 'barbed-wire', written: '有刺鉄線', reading: 'ゆうしてっせん', level: 'A20', inReviews: false, studyMode: null},
                 TABERU_MATCH,
             ],
         });
@@ -207,6 +223,20 @@ describe('BunproClient.findMatches', () => {
                 queries: [{key: 'q0', reviewable_type: 'Vocab', query: '食べる'}],
             },
         ]);
+    });
+
+    test('classifyStudyMode paints cloze vs translation from vocab detail', async () => {
+        const bunpro = createFakeBunpro();
+        const lookup = await bunpro.client.findMatches([TABERU_QUERY, {term: '有刺鉄線', reading: 'ゆうしてっせん', jmdictId: 1628790}]);
+        if (lookup.status !== 'ready' || lookup.matches[0] === null || lookup.matches[1] === null) {
+            throw new Error('expected matches');
+        }
+        expect((await bunpro.client.classifyStudyMode(lookup.matches[0])).studyMode).toStrictEqual('cloze');
+        expect((await bunpro.client.classifyStudyMode(lookup.matches[1])).studyMode).toStrictEqual('translation');
+        // Second call is cached.
+        const before = bunpro.requests.length;
+        expect((await bunpro.client.classifyStudyMode(lookup.matches[0])).studyMode).toStrictEqual('cloze');
+        expect(bunpro.requests.length).toStrictEqual(before);
     });
 
     test('hydrateMatches marks complete reviews in one call', async () => {

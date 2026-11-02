@@ -759,6 +759,15 @@ button.bunpro-added[hidden] {
     line-height: 1;
     text-decoration: none;
 }
+/* Cloze = Bunpro red; sentences-only = yellow; translation stays default (white/current). */
+.bunpro-control[data-study-mode=cloze] .bunpro-mark,
+.bunpro-control[data-study-mode=cloze] .bunpro-button-level {
+    color: #e03131;
+}
+.bunpro-control[data-study-mode=sentences] .bunpro-mark,
+.bunpro-control[data-study-mode=sentences] .bunpro-button-level {
+    color: #e6a817;
+}
 
 button.action-button {
     cursor: pointer;

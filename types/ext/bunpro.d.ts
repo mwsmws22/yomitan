@@ -26,6 +26,9 @@ export type BunproQuery = {
     jmdictId?: number;
 };
 
+/** How the vocab can be studied on Bunpro. `null` until classified. */
+export type StudyMode = 'cloze' | 'sentences' | 'translation';
+
 export type BunproMatch = {
     id: ReviewableId;
     kind: ReviewableKind;
@@ -35,6 +38,8 @@ export type BunproMatch = {
     reading: string;
     level: string | null;
     inReviews: boolean;
+    /** From included study questions; omit/`null` until fetched. */
+    studyMode?: StudyMode | null;
 };
 
 export type BunproStatus = 'disabled' | 'needsPermission' | 'signedOut' | 'ready';
