@@ -688,13 +688,12 @@ button.sidebar-button.sidebar-button-highlight {
 .bunpro-actions-container {
     display: flex;
     flex-flow: row nowrap;
-    align-items: center;
-    margin-right: 8px;
+    align-items: start;
 }
 .bunpro-control {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 0;
     color: var(--text-color);
     line-height: 1;
 }
@@ -708,14 +707,15 @@ button.bunpro-open {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 0.2em;
     border: 0;
     margin: 0;
-    padding: 2px;
+    padding: var(--action-button-padding);
     background: transparent;
     box-shadow: none;
     color: var(--text-color);
     font: inherit;
+    font-size: inherit;
     text-decoration: none;
     border-radius: 4px;
     white-space: nowrap;
@@ -743,30 +743,39 @@ button.bunpro-added[hidden] {
 .bunpro-added svg,
 .bunpro-mark {
     display: block;
-    width: 12px;
-    height: 12px;
+    width: var(--action-button-size);
+    height: var(--action-button-size);
     flex: none;
 }
 .bunpro-mark {
-    width: 13px;
-    height: 12px;
+    width: calc(var(--action-button-size) * 13 / 12);
 }
 .bunpro-button-level {
     color: var(--text-color);
-    font-size: 12px;
+    font-size: calc(12em / var(--font-size-no-units));
     font-weight: 650;
     letter-spacing: 0.02em;
     line-height: 1;
     text-decoration: none;
 }
-/* Cloze = Bunpro red; sentences-only = yellow; translation stays default (white/current). */
+/* Cloze = pastel green; sentences-only = pastel gold; translation stays default. */
+.bunpro-control[data-study-mode=cloze],
+.bunpro-control[data-study-mode=cloze] button.bunpro-status,
+.bunpro-control[data-study-mode=cloze] button.bunpro-added,
+.bunpro-control[data-study-mode=cloze] button.bunpro-status:disabled,
+.bunpro-control[data-study-mode=cloze] button.bunpro-added:disabled,
 .bunpro-control[data-study-mode=cloze] .bunpro-mark,
 .bunpro-control[data-study-mode=cloze] .bunpro-button-level {
-    color: #e03131;
+    color: #7ec99a;
 }
+.bunpro-control[data-study-mode=sentences],
+.bunpro-control[data-study-mode=sentences] button.bunpro-status,
+.bunpro-control[data-study-mode=sentences] button.bunpro-added,
+.bunpro-control[data-study-mode=sentences] button.bunpro-status:disabled,
+.bunpro-control[data-study-mode=sentences] button.bunpro-added:disabled,
 .bunpro-control[data-study-mode=sentences] .bunpro-mark,
 .bunpro-control[data-study-mode=sentences] .bunpro-button-level {
-    color: #e6a817;
+    color: #e0c35c;
 }
 
 button.action-button {

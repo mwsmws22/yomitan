@@ -619,6 +619,15 @@ a.heading-link-light {
 .settings-item-description.success-text {
     color: var(--success-color);
 }
+.settings-item-description .bunpro-study-mode-cloze {
+    color: #7ec99a;
+}
+.settings-item-description .bunpro-study-mode-sentences {
+    color: #e0c35c;
+}
+.settings-item-description .bunpro-study-mode-translation {
+    color: var(--text-color);
+}
 .settings-item-right.open-panel-button-container {
     padding: 0.25em 1em 0.25em 0.75em;
     max-height: calc(var(--settings-group-right-max-height) + var(--settings-group-inner-vertical-padding) * 2);

@@ -139,6 +139,9 @@ export class DisplayBunpro {
         }
         this._render();
 
+        const colorStudyModes = this._display.getOptions()?.bunpro.colorStudyModes === true;
+        if (!colorStudyModes) { return; }
+
         // After levels + reviews are visible, classify study mode one-by-one and paint as each returns.
         for (const match of hydrated) {
             if (this._generation !== generation || this._state !== state) { return; }

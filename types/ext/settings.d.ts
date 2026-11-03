@@ -385,6 +385,8 @@ export type ClipboardOptions = {
 
 export type BunproOptions = {
     enable: boolean;
+    /** Color the Bunpro mark by cloze / sentences / translation. Advanced. */
+    colorStudyModes: boolean;
 };
 
 export type AccessibilityOptions = {

@@ -1377,10 +1377,15 @@
                             "bunpro": {
                                 "type": "object",
                                 "required": [
-                                    "enable"
+                                    "enable",
+                                    "colorStudyModes"
                                 ],
                                 "properties": {
                                     "enable": {
+                                        "type": "boolean",
+                                        "default": false
+                                    },
+                                    "colorStudyModes": {
                                         "type": "boolean",
                                         "default": false
                                     }
