@@ -256,7 +256,16 @@
                     "value": {
                         "gecko": {
                             "id": "{5556b0ef-514a-40f7-97e0-397fe8a4f749}",
-                            "strict_min_version": "115.0"
+                            "strict_min_version": "115.0",
+                            "data_collection_permissions": {
+                                "required": [
+                                    "none"
+                                ],
+                                "optional": [
+                                    "authenticationInfo",
+                                    "websiteContent"
+                                ]
+                            }
                         },
                         "gecko_android": {
                             "strict_min_version": "115.0"
