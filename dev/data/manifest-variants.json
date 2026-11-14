@@ -1,11 +1,11 @@
 {
     "manifest": {
         "manifest_version": 3,
-        "name": "Yomitan Popup Dictionary",
+        "name": "Yomitan with Bunpro",
         "version": "$YOMITAN_VERSION",
-        "description": "Popup dictionary for language learning",
+        "description": "Yomitan fork with Bunpro reviews from Japanese dictionary entries",
         "author": {
-            "email": "themoeway@googlegroups.com"
+            "email": "mwsmws22@users.noreply.github.com"
         },
         "icons": {
             "16": "images/icon16.png",
@@ -26,7 +26,7 @@
                 "64": "images/icon64.png",
                 "128": "images/icon128.png"
             },
-            "default_title": "Yomitan",
+            "default_title": "Yomitan with Bunpro",
             "default_popup": "action-popup.html"
         },
         "background": {
@@ -131,7 +131,7 @@
         {
             "name": "chrome",
             "inherit": "base",
-            "fileName": "yomitan-chrome.zip",
+            "fileName": "yomitan-with-bunpro-chrome.zip",
             "excludeFiles": [
                 "background.html"
             ]
@@ -139,7 +139,7 @@
         {
             "name": "chrome-dev",
             "inherit": "chrome",
-            "fileName": "yomitan-chrome-dev.zip",
+            "fileName": "yomitan-with-bunpro-chrome-dev.zip",
             "modifications": [
                 {
                     "action": "replace",
@@ -164,7 +164,7 @@
         {
             "name": "chrome-playwright",
             "inherit": "chrome-dev",
-            "fileName": "yomitan-chrome-playwright.zip",
+            "fileName": "yomitan-with-bunpro-chrome-playwright.zip",
             "modifications": [
                 {
                     "action": "remove",
@@ -187,14 +187,14 @@
         {
             "name": "firefox",
             "inherit": "base",
-            "fileName": "yomitan-firefox.zip",
+            "fileName": "yomitan-with-bunpro-firefox.zip",
             "modifications": [
                 {
                     "action": "set",
                     "path": [
                         "author"
                     ],
-                    "value": "Yomidevs"
+                    "value": "mwsmws22"
                 },
                 {
                     "action": "delete",
@@ -255,7 +255,7 @@
                     ],
                     "value": {
                         "gecko": {
-                            "id": "{6b733b82-9261-47ee-a595-2dda294a4d08}",
+                            "id": "{5556b0ef-514a-40f7-97e0-397fe8a4f749}",
                             "strict_min_version": "115.0"
                         },
                         "gecko_android": {
@@ -281,7 +281,7 @@
         {
             "name": "firefox-dev",
             "inherit": "firefox",
-            "fileName": "yomitan-firefox-dev.zip",
+            "fileName": "yomitan-with-bunpro-firefox-dev.zip",
             "modifications": [
                 {
                     "action": "replace",
@@ -308,16 +308,7 @@
                         "gecko",
                         "id"
                     ],
-                    "value": "{2d13e145-294e-4ead-9bce-b4644b203a00}"
-                },
-                {
-                    "action": "set",
-                    "path": [
-                        "browser_specific_settings",
-                        "gecko",
-                        "update_url"
-                    ],
-                    "value": "https://raw.githubusercontent.com/yomidevs/yomitan/metadata/updates.json"
+                    "value": "{7e0a1869-a32a-4193-a19d-1944d9cea0e2}"
                 }
             ],
             "excludeFiles": [
@@ -330,7 +321,7 @@
         {
             "name": "firefox-android",
             "inherit": "firefox",
-            "fileName": "yomitan-firefox-android"
+            "fileName": "yomitan-with-bunpro-firefox-android"
         },
         {
             "name": "safari",
@@ -340,7 +331,7 @@
                     "path": [
                         "author"
                     ],
-                    "value": "Yomidevs"
+                    "value": "mwsmws22"
                 },
                 {
                     "action": "remove",
@@ -388,7 +379,7 @@
         {
             "name": "edge",
             "inherit": "base",
-            "fileName": "yomitan-edge.zip",
+            "fileName": "yomitan-with-bunpro-edge.zip",
             "excludeFiles": [
                 "background.html"
             ]
