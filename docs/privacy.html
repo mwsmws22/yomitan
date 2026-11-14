@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Privacy Policy — Yomitan with Bunpro</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --fg: #1a1a1a;
+            --muted: #555;
+            --bg: #fafafa;
+            --card: #fff;
+            --border: #e5e5e5;
+            --link: #0b57d0;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --fg: #f2f2f2;
+                --muted: #b0b0b0;
+                --bg: #121212;
+                --card: #1c1c1c;
+                --border: #333;
+                --link: #8ab4f8;
+            }
+        }
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.55;
+            color: var(--fg);
+            background: var(--bg);
+        }
+        main {
+            max-width: 42rem;
+            margin: 0 auto;
+            padding: 2.5rem 1.25rem 4rem;
+        }
+        h1 { font-size: 1.75rem; margin: 0 0 0.35rem; }
+        h2 { font-size: 1.15rem; margin: 2rem 0 0.6rem; }
+        p, li { color: var(--fg); }
+        .meta { color: var(--muted); font-size: 0.95rem; margin: 0 0 1.5rem; }
+        a { color: var(--link); }
+        ul { padding-left: 1.25rem; }
+        li { margin: 0.35rem 0; }
+        .note {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.9rem 1rem;
+            margin: 1rem 0 0;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Yomitan with Bunpro · Last updated: 14 November 2026</p>
+
+    <div class="note">
+        <strong>Yomitan with Bunpro</strong> is an unofficial community fork of
+        <a href="https://github.com/yomidevs/yomitan">Yomitan</a>.
+        It is <strong>not affiliated with</strong> yomidevs, the official Yomitan project, or Bunpro Inc.
+    </div>
+
+    <h2>What this extension stores locally</h2>
+    <p>
+        Settings, dictionaries you import, and other extension data are stored in your browser’s
+        local extension storage. That data stays on your device unless a feature below sends it elsewhere.
+    </p>
+
+    <h2>Bunpro integration (optional)</h2>
+    <p>Only when you enable Bunpro and save an API key:</p>
+    <ul>
+        <li>Your Bunpro API key is stored locally in the extension.</li>
+        <li>The key is sent only to <a href="https://api.bunpro.jp"><code>https://api.bunpro.jp</code></a>
+            (Bunpro’s frontend API), using Bunpro’s documented API-token authentication.</li>
+        <li>Lookups may send Japanese headwords and/or JMdict sequence ids to Bunpro so the extension
+            can find matching vocabulary and show review status.</li>
+        <li>Add / remove review actions send the relevant Bunpro vocabulary identifiers to the same API.</li>
+        <li>The API key is never sent to the extension author, analytics services, or any host other than Bunpro.</li>
+    </ul>
+    <p>
+        If Bunpro is disabled, or no API key is saved, the extension does not contact Bunpro.
+        You can clear the saved key at any time in Settings → Bunpro.
+    </p>
+
+    <h2>Other optional network features (inherited from Yomitan)</h2>
+    <p>Same as upstream Yomitan, and only when you turn them on:</p>
+    <ul>
+        <li><strong>Audio</strong> — may send term/reading/language to the audio source you configured.</li>
+        <li><strong>Anki</strong> — may send note data to AnkiConnect on your machine (or the host you configure).</li>
+        <li><strong>Parsing / mecab-style helpers</strong> — may send text to a local or configured parsing service.</li>
+        <li><strong>Clipboard / native messaging</strong> — only if you grant those permissions.</li>
+    </ul>
+
+    <h2>Analytics and tracking</h2>
+    <p>
+        This fork does not include analytics, advertising, crash-reporting SDKs, or account systems
+        of its own. It does not sell personal data.
+    </p>
+
+    <h2>Permissions</h2>
+    <p>
+        Broad site access is used so the dictionary popup can run on pages you read.
+        Bunpro traffic uses that same network capability and is limited in practice to
+        <code>api.bunpro.jp</code> when the integration is enabled.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+        Questions or privacy requests:
+        <a href="https://github.com/mwsmws22/yomitan/issues">github.com/mwsmws22/yomitan/issues</a>
+    </p>
+</main>
+</body>
+</html>
