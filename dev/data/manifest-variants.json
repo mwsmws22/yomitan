@@ -321,7 +321,7 @@
         {
             "name": "firefox-android",
             "inherit": "firefox",
-            "fileName": "yomitan-with-bunpro-firefox-android"
+            "fileName": "yomitan-with-bunpro-firefox-android.zip"
         },
         {
             "name": "safari",
