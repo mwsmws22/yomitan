@@ -1,7 +1,7 @@
 {
     "manifest": {
         "manifest_version": 3,
-        "name": "Yomitan with Bunpro",
+        "name": "YomiBun",
         "version": "$YOMITAN_VERSION",
         "description": "Yomitan fork with Bunpro reviews from Japanese dictionary entries",
         "author": {
@@ -26,7 +26,7 @@
                 "64": "images/icon64.png",
                 "128": "images/icon128.png"
             },
-            "default_title": "Yomitan with Bunpro",
+            "default_title": "YomiBun",
             "default_popup": "action-popup.html"
         },
         "background": {
@@ -131,7 +131,7 @@
         {
             "name": "chrome",
             "inherit": "base",
-            "fileName": "yomitan-with-bunpro-chrome.zip",
+            "fileName": "yomibun-chrome.zip",
             "excludeFiles": [
                 "background.html"
             ]
@@ -139,7 +139,7 @@
         {
             "name": "chrome-dev",
             "inherit": "chrome",
-            "fileName": "yomitan-with-bunpro-chrome-dev.zip",
+            "fileName": "yomibun-chrome-dev.zip",
             "modifications": [
                 {
                     "action": "replace",
@@ -164,7 +164,7 @@
         {
             "name": "chrome-playwright",
             "inherit": "chrome-dev",
-            "fileName": "yomitan-with-bunpro-chrome-playwright.zip",
+            "fileName": "yomibun-chrome-playwright.zip",
             "modifications": [
                 {
                     "action": "remove",
@@ -187,7 +187,7 @@
         {
             "name": "firefox",
             "inherit": "base",
-            "fileName": "yomitan-with-bunpro-firefox.zip",
+            "fileName": "yomibun-firefox.zip",
             "modifications": [
                 {
                     "action": "set",
@@ -290,7 +290,7 @@
         {
             "name": "firefox-dev",
             "inherit": "firefox",
-            "fileName": "yomitan-with-bunpro-firefox-dev.zip",
+            "fileName": "yomibun-firefox-dev.zip",
             "modifications": [
                 {
                     "action": "replace",
@@ -330,7 +330,7 @@
         {
             "name": "firefox-android",
             "inherit": "firefox",
-            "fileName": "yomitan-with-bunpro-firefox-android.zip"
+            "fileName": "yomibun-firefox-android.zip"
         },
         {
             "name": "safari",
@@ -388,7 +388,7 @@
         {
             "name": "edge",
             "inherit": "base",
-            "fileName": "yomitan-with-bunpro-edge.zip",
+            "fileName": "yomibun-edge.zip",
             "excludeFiles": [
                 "background.html"
             ]
